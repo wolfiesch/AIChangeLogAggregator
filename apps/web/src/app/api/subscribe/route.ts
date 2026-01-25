@@ -3,6 +3,7 @@ import { randomBytes } from "crypto";
 import { db } from "@/lib/db";
 import { emailSubscribers } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import { sendVerificationEmail } from "@/lib/email";
 
 export async function POST(request: NextRequest) {
   try {
@@ -71,9 +72,13 @@ export async function POST(request: NextRequest) {
       unsubscribeToken,
     });
 
-    // In production, send verification email using Resend or similar
-    // For now, auto-verify for testing
-    // TODO: Implement email verification with Resend
+    // Send verification email
+    try {
+      await sendVerificationEmail(email.toLowerCase(), verificationToken);
+    } catch (emailError) {
+      console.error("Failed to send verification email:", emailError);
+      // Continue anyway - subscriber is created, they can request resend
+    }
 
     return NextResponse.json({
       message: "Thanks for subscribing! Check your email to confirm.",

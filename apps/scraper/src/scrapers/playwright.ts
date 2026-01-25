@@ -32,16 +32,16 @@ export class PlaywrightScraper implements Scraper {
       const page = await context.newPage();
 
       try {
-        // Navigate to page
+        // Navigate to page (60s timeout for slow Next.js sites like Windsurf)
         await page.goto(source.url, {
           waitUntil: "networkidle",
-          timeout: 30000,
+          timeout: 60000,
         });
 
         // Wait for content to load
         if (config.waitForSelector) {
           await page.waitForSelector(config.waitForSelector, {
-            timeout: 10000,
+            timeout: 15000,
           });
         }
 
