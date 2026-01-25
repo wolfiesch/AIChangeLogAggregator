@@ -69,10 +69,10 @@ export class StealthScraper implements Scraper {
           };
         });
 
-        // Navigate with extended timeout
+        // Navigate with extended timeout (60s for slow Next.js sites like Windsurf)
         await page.goto(source.url, {
           waitUntil: "networkidle2",
-          timeout: 45000,
+          timeout: 60000,
         });
 
         // Wait for content selector if specified
