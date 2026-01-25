@@ -1,0 +1,29 @@
+# Fly.io configuration for AI Changelog Scraper
+
+app = 'ai-changelog-scraper'
+primary_region = 'sjc'
+
+[build]
+  dockerfile = 'Dockerfile'
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = 'off'
+  auto_start_machines = true
+  min_machines_running = 1
+
+[env]
+  NODE_ENV = 'production'
+  PORT = '8080'
+
+[[vm]]
+  memory = '1gb'
+  cpu_kind = 'shared'
+  cpus = 1
+
+# Scheduled scrape job - every 6 hours
+[[scheduled]]
+  command = 'node dist/jobs/scrape.js'
+  schedule = '0 */6 * * *'
+  region = 'sjc'

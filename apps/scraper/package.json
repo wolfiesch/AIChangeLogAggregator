@@ -1,0 +1,31 @@
+{
+  "name": "scraper",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "scrape": "tsx src/jobs/scrape.ts",
+    "scrape:source": "tsx src/jobs/scrape-source.ts"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.13.8",
+    "@neondatabase/serverless": "^0.10.4",
+    "@octokit/rest": "^21.1.0",
+    "cheerio": "^1.0.0",
+    "drizzle-orm": "^0.38.3",
+    "hono": "^4.7.0",
+    "marked": "^15.0.6",
+    "playwright": "^1.50.0",
+    "puppeteer": "^23.0.0",
+    "puppeteer-extra": "^3.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.7",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
+  }
+}

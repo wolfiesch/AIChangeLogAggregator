@@ -1,0 +1,268 @@
+import { neon } from "@neondatabase/serverless";
+import { drizzle } from "drizzle-orm/neon-http";
+import { eq } from "drizzle-orm";
+import { sources } from "./schema";
+
+const sql = neon(process.env.DATABASE_URL!);
+const db = drizzle(sql);
+
+/**
+ * Update existing sources with new selectorConfig and isActive values
+ * This script allows updating sources without recreating them
+ */
+
+interface SourceUpdate {
+  url: string;
+  selectorConfig?: Record<string, unknown>;
+  isActive?: boolean;
+  scrapeMethod?: "static" | "github_api" | "playwright";
+}
+
+const sourceUpdates: SourceUpdate[] = [
+  // ==================== OpenAI ====================
+  {
+    url: "https://developers.openai.com/changelog/",
+    selectorConfig: {
+      entrySelector: "ul > li",
+      titleSelector: "strong, b",
+      contentSelector: "li",
+    },
+  },
+  {
+    url: "https://developers.openai.com/codex/changelog/",
+    selectorConfig: {
+      entrySelector: "ul > li",
+      titleSelector: "strong, b",
+      contentSelector: "li",
+    },
+  },
+
+  // ==================== Google ====================
+  // Note: <ul> elements are siblings of <h2>, not children, so we use siblingContentSelector
+  {
+    url: "https://ai.google.dev/gemini-api/docs/changelog",
+    selectorConfig: {
+      entrySelector: "h2",
+      dateSelector: "h2",
+      titleSelector: "h2",
+      siblingContentSelector: "ul",
+    },
+  },
+
+  // ==================== Cohere (disabled - 404) ====================
+  {
+    url: "https://docs.cohere.com/changelog",
+    isActive: false,
+  },
+  {
+    url: "https://docs.cohere.com/docs/deprecations",
+    isActive: false,
+  },
+
+  // ==================== DeepSeek ====================
+  {
+    url: "https://api-docs.deepseek.com/updates",
+    selectorConfig: {
+      entrySelector: "h2[id^='date-']",
+      dateSelector: "h2",
+      titleSelector: "h3",
+      contentSelector: "ul li, p",
+    },
+  },
+  {
+    url: "https://api-docs.deepseek.com/news/",
+    isActive: false, // 404 Not Found
+  },
+
+  // ==================== Perplexity ====================
+  {
+    url: "https://www.perplexity.ai/changelog",
+    isActive: false, // 403 Forbidden - bot detection
+  },
+  {
+    url: "https://docs.perplexity.ai/changelog/changelog",
+    selectorConfig: {
+      entrySelector: "h2",
+      dateSelector: "h2",
+      titleSelector: "strong, b",
+      contentSelector: "ul li, p",
+    },
+  },
+
+  // ==================== Cursor ====================
+  {
+    url: "https://cursor.com/changelog",
+    selectorConfig: {
+      entrySelector: "article",
+      dateSelector: "time[dateTime]",
+      titleSelector: "h1",
+      contentSelector: "div.prose, div[class*='prose']",
+    },
+  },
+
+  // ==================== Windsurf (Next.js - requires playwright) ====================
+  // Note: <ul> elements are siblings of <h2>, not children, so we use siblingContentSelector
+  {
+    url: "https://windsurf.com/changelog",
+    scrapeMethod: "playwright",
+    selectorConfig: {
+      waitForSelector: "main h2",
+      entrySelector: "h2",
+      dateSelector: "h2",
+      titleSelector: "h2",
+      siblingContentSelector: "ul",
+    },
+  },
+  {
+    url: "https://windsurf.com/changelog/jetbrains",
+    scrapeMethod: "playwright",
+    selectorConfig: {
+      waitForSelector: "main h2",
+      entrySelector: "h2",
+      dateSelector: "h2",
+      titleSelector: "h2",
+      siblingContentSelector: "ul",
+    },
+  },
+  {
+    url: "https://windsurf.com/changelog/vscode",
+    scrapeMethod: "playwright",
+    selectorConfig: {
+      waitForSelector: "main h2",
+      entrySelector: "h2",
+      dateSelector: "h2",
+      titleSelector: "h2",
+      siblingContentSelector: "ul",
+    },
+  },
+  {
+    url: "https://windsurf.com/changelog/windsurf-next",
+    scrapeMethod: "playwright",
+    selectorConfig: {
+      waitForSelector: "main h2",
+      entrySelector: "h2",
+      dateSelector: "h2",
+      titleSelector: "h2",
+      siblingContentSelector: "ul",
+    },
+  },
+  {
+    url: "https://windsurf.com/changelog/jetbrains-prerelease",
+    scrapeMethod: "playwright",
+    selectorConfig: {
+      waitForSelector: "main h2",
+      entrySelector: "h2",
+      dateSelector: "h2",
+      titleSelector: "h2",
+      siblingContentSelector: "ul",
+    },
+  },
+
+  // ==================== Mistral ====================
+  {
+    url: "https://docs.mistral.ai/getting-started/changelog",
+    selectorConfig: {
+      entrySelector: "div.changelog-content, section",
+      dateSelector: "h2, h3",
+      titleSelector: "h3",
+      contentSelector: "ul li, p",
+    },
+  },
+
+  // ==================== Together AI ====================
+  {
+    url: "https://docs.together.ai/docs/changelog",
+    selectorConfig: {
+      entrySelector: "h2",
+      dateSelector: "h2",
+      titleSelector: "strong, b",
+      contentSelector: "ul li, p",
+    },
+  },
+
+  // ==================== Replicate ====================
+  {
+    url: "https://replicate.com/changelog",
+    selectorConfig: {
+      entrySelector: "a[href^='/changelog/']",
+      dateSelector: "time, p",
+      titleSelector: "h2, h3, strong",
+      linkSelector: "a[href^='/changelog/']",
+      contentSelector: "p",
+    },
+  },
+
+  // ==================== Groq ====================
+  {
+    url: "https://console.groq.com/docs/changelog",
+    selectorConfig: {
+      entrySelector: "h3",
+      dateSelector: "h3",
+      titleSelector: "h3",
+      contentSelector: "ul li, p",
+    },
+  },
+];
+
+async function updateSources() {
+  console.log("🔄 Updating existing sources...\n");
+
+  let updated = 0;
+  let notFound = 0;
+  let errors = 0;
+
+  for (const update of sourceUpdates) {
+    try {
+      // Build the update object
+      const updateValues: Partial<typeof sources.$inferInsert> = {};
+
+      if (update.selectorConfig !== undefined) {
+        updateValues.selectorConfig = update.selectorConfig;
+      }
+      if (update.isActive !== undefined) {
+        updateValues.isActive = update.isActive;
+      }
+      if (update.scrapeMethod !== undefined) {
+        updateValues.scrapeMethod = update.scrapeMethod;
+      }
+
+      // Skip if nothing to update
+      if (Object.keys(updateValues).length === 0) {
+        continue;
+      }
+
+      const result = await db
+        .update(sources)
+        .set(updateValues)
+        .where(eq(sources.url, update.url))
+        .returning({ id: sources.id, url: sources.url });
+
+      if (result.length > 0) {
+        const status = update.isActive === false ? "DISABLED" : "UPDATED";
+        console.log(`  ✓ [${status}] ${update.url}`);
+        updated++;
+      } else {
+        console.log(`  ⚠ [NOT FOUND] ${update.url}`);
+        notFound++;
+      }
+    } catch (error) {
+      console.error(`  ✗ [ERROR] ${update.url}: ${error}`);
+      errors++;
+    }
+  }
+
+  console.log("\n📊 Summary:");
+  console.log(`   Updated:   ${updated}`);
+  console.log(`   Not found: ${notFound}`);
+  console.log(`   Errors:    ${errors}`);
+}
+
+updateSources()
+  .then(() => {
+    console.log("\n✅ Update complete!");
+    process.exit(0);
+  })
+  .catch((err) => {
+    console.error("\n❌ Update failed:", err);
+    process.exit(1);
+  });

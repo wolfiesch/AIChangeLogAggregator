@@ -1,0 +1,1 @@
+ALTER TABLE "changelog_entries" ALTER COLUMN "version" SET DATA TYPE varchar(255);

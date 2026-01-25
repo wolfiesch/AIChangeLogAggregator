@@ -1,0 +1,13 @@
+{
+  "name": "ai-changelog-aggregator",
+  "private": true,
+  "scripts": {
+    "dev": "cd apps/web && npm run dev",
+    "build": "cd apps/web && npm run build",
+    "db:seed": "cd packages/db && npx tsx src/seed.ts",
+    "scraper:dev": "cd apps/scraper && npm run dev"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
