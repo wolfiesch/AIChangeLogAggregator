@@ -4,6 +4,27 @@ import type { Scraper, ScrapeResult, ParsedEntry } from "./base.js";
 import { parseSelectorConfig } from "./base.js";
 
 /**
+ * Parse various date formats including YYYY.MM.DD (Gemini style)
+ */
+function parseDate(dateStr: string): Date | undefined {
+  if (!dateStr) return undefined;
+
+  // Try "YYYY.MM.DD" format (e.g., "2026.01.20" used by Gemini)
+  const dotMatch = dateStr.match(/(\d{4})\.(\d{2})\.(\d{2})/);
+  if (dotMatch) {
+    const [, year, month, day] = dotMatch;
+    const parsed = new Date(`${year}-${month}-${day}`);
+    if (!isNaN(parsed.getTime())) return parsed;
+  }
+
+  // Try standard Date constructor
+  const parsed = new Date(dateStr);
+  if (!isNaN(parsed.getTime())) return parsed;
+
+  return undefined;
+}
+
+/**
  * Playwright scraper for JavaScript-rendered pages
  * Used for ~8 sources that require browser rendering:
  * - Grok Changelog (Next.js)
@@ -120,10 +141,7 @@ export class PlaywrightScraper implements Scraper {
         }
 
         if (dateStr) {
-          const parsed = new Date(dateStr);
-          if (!isNaN(parsed.getTime())) {
-            publishedDate = parsed;
-          }
+          publishedDate = parseDate(dateStr);
         }
       }
 
@@ -147,10 +165,7 @@ export class PlaywrightScraper implements Scraper {
           config.siblingDateSelector
         );
         if (siblingDateStr) {
-          const parsed = new Date(siblingDateStr);
-          if (!isNaN(parsed.getTime())) {
-            publishedDate = parsed;
-          }
+          publishedDate = parseDate(siblingDateStr);
         }
       }
 

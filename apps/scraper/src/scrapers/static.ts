@@ -195,6 +195,16 @@ function parseDate(dateStr: string): Date | undefined {
     return isoDate;
   }
 
+  // Try "YYYY.MM.DD" format (e.g., "2026.01.20" used by Gemini)
+  const dotMatch = dateStr.match(/(\d{4})\.(\d{2})\.(\d{2})/);
+  if (dotMatch) {
+    const [, year, month, day] = dotMatch;
+    const parsed = new Date(`${year}-${month}-${day}`);
+    if (!isNaN(parsed.getTime())) {
+      return parsed;
+    }
+  }
+
   // Try common formats
   const patterns = [
     // "January 15, 2025" or "Jan 15, 2025"

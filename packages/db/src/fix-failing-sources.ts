@@ -22,25 +22,29 @@ const sourceFixes: SourceFix[] = [
   // =============================================================================
   // NEEDS PLAYWRIGHT (Next.js / React sites that require JS rendering)
   // =============================================================================
+  // NOTE: docs.anthropic.com redirects to platform.claude.com
+  // Using OLD URL to match what's in the database (redirect happens automatically)
   {
     url: "https://docs.anthropic.com/en/release-notes/overview",
     scrapeMethod: "playwright",
     selectorConfig: {
-      waitForSelector: "main",
-      entrySelector: "h2",
-      dateSelector: "h2",
-      siblingContentSelector: "ul, p",
+      // The page uses h3 for dates (### January 12, 2026) with ul lists following
+      // waitForSelector changed from "main" to more robust selectors
+      waitForSelector: "article, [class*='prose'], h3",
+      entrySelector: "h3",
+      dateSelector: "h3",
+      siblingContentSelector: "ul",
     },
-    reason: "Next.js site requires JS rendering",
+    reason: "Next.js site requires JS rendering; h3 headers with sibling ul content",
   },
   {
     url: "https://docs.anthropic.com/en/release-notes/claude-apps",
     scrapeMethod: "playwright",
     selectorConfig: {
-      waitForSelector: "main",
-      entrySelector: "h2",
-      dateSelector: "h2",
-      siblingContentSelector: "ul, p",
+      waitForSelector: "article, [class*='prose'], h3",
+      entrySelector: "h3",
+      dateSelector: "h3",
+      siblingContentSelector: "ul",
     },
     reason: "Next.js site requires JS rendering",
   },
@@ -48,24 +52,26 @@ const sourceFixes: SourceFix[] = [
     url: "https://gemini.google/release-notes/",
     scrapeMethod: "playwright",
     selectorConfig: {
-      waitForSelector: "main",
-      entrySelector: "section, article",
-      dateSelector: "time, h2",
-      contentSelector: "p, ul li",
+      // Flat structure: h2 (date YYYY.MM.DD) followed by h3 (title) followed by ul (content)
+      waitForSelector: "h3",
+      entrySelector: "h3",
+      siblingDateSelector: "h2",
+      siblingContentSelector: "ul",
     },
-    reason: "Google site may require JS rendering",
+    reason: "Google site with flat h2/h3/ul structure",
   },
   {
     url: "https://changelog.continue.dev/",
     scrapeMethod: "playwright",
     selectorConfig: {
-      waitForSelector: "main",
-      entrySelector: "article",
+      // Uses div.changelog-entry containers with time elements and prose content
+      waitForSelector: "div.changelog-entry",
+      entrySelector: "div.changelog-entry",
       dateSelector: "time",
-      titleSelector: "h2, h3",
-      contentSelector: "p, ul li",
+      titleSelector: "h1",
+      contentSelector: "div.prose",
     },
-    reason: "React site requires JS rendering",
+    reason: "React site with div.changelog-entry containers",
   },
 
   // =============================================================================
@@ -83,13 +89,8 @@ const sourceFixes: SourceFix[] = [
   },
   {
     url: "https://docs.perplexity.ai/changelog/changelog",
-    selectorConfig: {
-      // Perplexity uses h2 for monthly sections with sibling content
-      entrySelector: "h2",
-      dateSelector: "h2",
-      siblingContentSelector: "ul, p",
-    },
-    reason: "Fixed selectors for Mintlify-style docs",
+    isActive: false, // Site has strong anti-bot protection, content renders as JS
+    reason: "Perplexity has strong anti-bot protection - needs investigation",
   },
   {
     url: "https://docs.ai21.com/changelog",
@@ -104,21 +105,24 @@ const sourceFixes: SourceFix[] = [
   {
     url: "https://docs.tabnine.com/main/administering-tabnine/release-notes",
     selectorConfig: {
-      // Tabnine uses GitBook/Mintlify style
-      entrySelector: "h2",
-      dateSelector: "h2",
+      // Tabnine uses h3 for version headers with <mark> elements for dates
+      // Format: ### v5.27.1 followed by <mark>January 19, 2026</mark>
+      entrySelector: "h3",
+      dateSelector: "mark, h3 + mark",
       siblingContentSelector: "ul, p",
     },
-    reason: "Fixed selectors for Mintlify-style docs",
+    reason: "Fixed selectors for GitBook-style docs with h3 versions and mark dates",
   },
   {
     url: "https://platform.stability.ai/docs/release-notes",
+    scrapeMethod: "playwright", // Behind Cloudflare protection
     selectorConfig: {
+      waitForSelector: "main, article, h2",
       entrySelector: "h2",
       dateSelector: "h2",
       siblingContentSelector: "ul, p",
     },
-    reason: "Fixed selectors for docs site",
+    reason: "Cloudflare protected site needs playwright with stealth",
   },
   {
     url: "https://geminicli.com/docs/changelogs/",
@@ -222,13 +226,8 @@ const sourceFixes: SourceFix[] = [
   // =============================================================================
   {
     url: "https://aws.amazon.com/developer/generative-ai/amazon-q/change-log/",
-    selectorConfig: {
-      // AWS marketing pages structure
-      entrySelector: "article, section, div[class*='change']",
-      dateSelector: "time, h3, span",
-      contentSelector: "p, ul li",
-    },
-    reason: "Fixed selectors for AWS marketing pages",
+    isActive: false, // URL redirects to builder.aws.com - no longer a changelog
+    reason: "URL moved (301 redirect to builder.aws.com/learn/topics/agentic-ai) - needs new source URL",
   },
 ];
 

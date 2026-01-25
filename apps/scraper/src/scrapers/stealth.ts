@@ -27,6 +27,8 @@ export class StealthScraper implements Scraper {
       if (!this.browser) {
         this.browser = await puppeteer.launch({
           headless: true,
+          // Increase browser launch timeout from 30s default to 60s for resource-constrained environments
+          timeout: 60000,
           args: [
             "--no-sandbox",
             "--disable-setuid-sandbox",
@@ -151,15 +153,23 @@ export class StealthScraper implements Scraper {
         );
 
         entryElements.forEach((el) => {
-          // Extract date
+          // Extract date - handle "entry-as-date" pattern
           let publishedDate: string | undefined;
           if (cfg.dateSelector) {
-            const dateEl = el.querySelector(cfg.dateSelector);
-            if (dateEl) {
+            // If entrySelector === dateSelector, the entry itself contains the date
+            if (cfg.entrySelector === cfg.dateSelector) {
               publishedDate =
-                dateEl.getAttribute("datetime") ||
-                dateEl.textContent?.trim() ||
+                el.getAttribute("datetime") ||
+                el.textContent?.trim() ||
                 undefined;
+            } else {
+              const dateEl = el.querySelector(cfg.dateSelector);
+              if (dateEl) {
+                publishedDate =
+                  dateEl.getAttribute("datetime") ||
+                  dateEl.textContent?.trim() ||
+                  undefined;
+              }
             }
           }
 
@@ -181,7 +191,38 @@ export class StealthScraper implements Scraper {
               content = contentEl.textContent?.trim() || "";
               contentHtml = contentEl.innerHTML;
             }
-          } else {
+          }
+
+          // Fallback: check for sibling-based content (e.g., <h2>Title</h2><ul>content</ul>)
+          if (!content && cfg.siblingContentSelector) {
+            const contentParts: string[] = [];
+            const htmlParts: string[] = [];
+            let sibling = el.nextElementSibling;
+
+            while (sibling) {
+              // Stop if we hit another entry element
+              if (
+                sibling.tagName === el.tagName &&
+                sibling.className === el.className
+              ) {
+                break;
+              }
+
+              if (sibling.matches(cfg.siblingContentSelector)) {
+                contentParts.push(sibling.textContent?.trim() || "");
+                htmlParts.push(sibling.outerHTML);
+              }
+              sibling = sibling.nextElementSibling;
+            }
+
+            if (contentParts.length) {
+              content = contentParts.join("\n");
+              contentHtml = htmlParts.join("\n");
+            }
+          }
+
+          // Final fallback: use entry element itself
+          if (!content) {
             content = el.textContent?.trim() || "";
             contentHtml = el.innerHTML;
           }
@@ -228,8 +269,20 @@ export class StealthScraper implements Scraper {
 
   /**
    * Parse date string to Date object
+   * Handles various formats including YYYY.MM.DD (Gemini style)
    */
   private parseDate(dateStr: string): Date | undefined {
+    if (!dateStr) return undefined;
+
+    // Try "YYYY.MM.DD" format (e.g., "2026.01.20" used by Gemini)
+    const dotMatch = dateStr.match(/(\d{4})\.(\d{2})\.(\d{2})/);
+    if (dotMatch) {
+      const [, year, month, day] = dotMatch;
+      const parsed = new Date(`${year}-${month}-${day}`);
+      if (!isNaN(parsed.getTime())) return parsed;
+    }
+
+    // Try standard Date constructor
     const parsed = new Date(dateStr);
     return isNaN(parsed.getTime()) ? undefined : parsed;
   }

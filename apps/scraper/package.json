@@ -8,7 +8,7 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "scrape": "tsx src/jobs/scrape.ts",
-    "scrape:source": "tsx src/jobs/scrape-source.ts"
+    "test:scraper": "tsx src/jobs/test-scraper.ts"
   },
   "dependencies": {
     "@hono/node-server": "^1.13.8",
