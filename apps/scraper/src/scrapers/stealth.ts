@@ -29,12 +29,19 @@ export class StealthScraper implements Scraper {
           headless: true,
           // Increase browser launch timeout from 30s default to 60s for resource-constrained environments
           timeout: 60000,
+          // Increase protocol timeout for CDP commands (fixes "Network.setUserAgentOverride timed out" crash)
+          // Default is 180s, but stealth plugin user-agent-override can timeout under memory pressure
+          protocolTimeout: 120000,
           args: [
             "--no-sandbox",
             "--disable-setuid-sandbox",
             "--disable-blink-features=AutomationControlled",
             "--disable-infobars",
             "--window-size=1920,1080",
+            // Reduce memory usage
+            "--disable-dev-shm-usage",
+            "--disable-gpu",
+            "--single-process",
           ],
         });
       }
