@@ -1,7 +1,7 @@
 import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
 import { eq } from "drizzle-orm";
-import { sources } from "./schema";
+import { sources, products } from "./schema";
 
 const sql = neon(process.env.DATABASE_URL!);
 const db = drizzle(sql);
@@ -31,9 +31,11 @@ const sourceUpdates: SourceUpdate[] = [
   {
     url: "https://developers.openai.com/codex/changelog/",
     selectorConfig: {
-      entrySelector: "ul > li",
-      titleSelector: "strong, b",
-      contentSelector: "li",
+      // Codex changelog: entries are <li data-product="codex"> with <time>, <h3>, and <article>
+      entrySelector: "li[data-product='codex']",
+      dateSelector: "time",
+      titleSelector: "h3",
+      contentSelector: "article",
     },
   },
 
@@ -257,7 +259,34 @@ async function updateSources() {
   console.log(`   Errors:    ${errors}`);
 }
 
-updateSources()
+async function renameProducts() {
+  console.log("\n🔄 Renaming products...\n");
+
+  // Rename "Codex CLI" → "Codex" (now covers both CLI and desktop app)
+  const result = await db
+    .update(products)
+    .set({
+      name: "Codex",
+      slug: "openai-codex",
+      type: "desktop",
+      description: "OpenAI Codex CLI and desktop application",
+    })
+    .where(eq(products.slug, "openai-codex-cli"))
+    .returning({ id: products.id, slug: products.slug });
+
+  if (result.length > 0) {
+    console.log(`  ✓ [RENAMED] openai-codex-cli → openai-codex`);
+  } else {
+    console.log(`  ⚠ [NOT FOUND] openai-codex-cli (may already be renamed)`);
+  }
+}
+
+async function main() {
+  await renameProducts();
+  await updateSources();
+}
+
+main()
   .then(() => {
     console.log("\n✅ Update complete!");
     process.exit(0);

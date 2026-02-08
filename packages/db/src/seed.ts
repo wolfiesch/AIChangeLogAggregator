@@ -156,10 +156,10 @@ const seedProducts: SeedProduct[] = [
   },
   {
     providerSlug: "openai",
-    name: "Codex CLI",
-    slug: "openai-codex-cli",
-    type: "cli",
-    description: "OpenAI Codex command-line tool",
+    name: "Codex",
+    slug: "openai-codex",
+    type: "desktop",
+    description: "OpenAI Codex CLI and desktop application",
   },
   {
     providerSlug: "openai",
@@ -571,18 +571,19 @@ const seedSources: SeedSource[] = [
     },
   },
   {
-    productSlug: "openai-codex-cli",
+    productSlug: "openai-codex",
     url: "https://developers.openai.com/codex/changelog/",
     scrapeMethod: "static",
     selectorConfig: {
-      // Same structure as main OpenAI changelog
-      entrySelector: "ul > li",
-      titleSelector: "strong, b",
-      contentSelector: "li",
+      // Codex changelog: entries are <li data-product="codex"> with <time>, <h3>, and <article>
+      entrySelector: "li[data-product='codex']",
+      dateSelector: "time",
+      titleSelector: "h3",
+      contentSelector: "article",
     },
   },
   {
-    productSlug: "openai-codex-cli",
+    productSlug: "openai-codex",
     url: "https://github.com/openai/codex/releases",
     scrapeMethod: "github_api",
     selectorConfig: {
