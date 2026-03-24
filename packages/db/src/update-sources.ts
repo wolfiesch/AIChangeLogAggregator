@@ -1,7 +1,7 @@
 import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
-import { eq } from "drizzle-orm";
-import { sources, products } from "./schema";
+import { eq, and } from "drizzle-orm";
+import { sources, products, providers } from "./schema";
 
 const sql = neon(process.env.DATABASE_URL!);
 const db = drizzle(sql);
@@ -31,10 +31,11 @@ const sourceUpdates: SourceUpdate[] = [
   {
     url: "https://developers.openai.com/codex/changelog/",
     selectorConfig: {
-      // Codex changelog: entries are <li data-product="codex"> with <time>, <h3>, and <article>
-      entrySelector: "li[data-product='codex']",
+      // Codex changelog: general announcements only (GPT-5.4 mini, etc.)
+      // CLI releases come from GitHub API, App releases from separate source
+      entrySelector: "li[data-codex-topics='general']",
       dateSelector: "time",
-      titleSelector: "h3",
+      titleSelector: "h3 > span:first-child",
       contentSelector: "article",
     },
   },
@@ -259,30 +260,115 @@ async function updateSources() {
   console.log(`   Errors:    ${errors}`);
 }
 
-async function renameProducts() {
-  console.log("\n🔄 Renaming products...\n");
+async function updateCodexProducts() {
+  console.log("\n🔄 Updating Codex products...\n");
 
-  // Rename "Codex CLI" → "Codex" (now covers both CLI and desktop app)
-  const result = await db
+  // Update existing "Codex" product to be CLI-specific
+  const updateResult = await db
     .update(products)
     .set({
-      name: "Codex",
-      slug: "openai-codex",
-      type: "desktop",
-      description: "OpenAI Codex CLI and desktop application",
+      name: "Codex CLI",
+      type: "cli",
+      description: "OpenAI Codex CLI coding agent",
     })
-    .where(eq(products.slug, "openai-codex-cli"))
+    .where(eq(products.slug, "openai-codex"))
     .returning({ id: products.id, slug: products.slug });
 
-  if (result.length > 0) {
-    console.log(`  ✓ [RENAMED] openai-codex-cli → openai-codex`);
-  } else {
-    console.log(`  ⚠ [NOT FOUND] openai-codex-cli (may already be renamed)`);
+  if (updateResult.length > 0) {
+    console.log(`  ✓ [UPDATED] openai-codex → "Codex CLI" (type: cli)`);
   }
+
+  // Check if Codex App product already exists
+  const existing = await db
+    .select()
+    .from(products)
+    .where(eq(products.slug, "openai-codex-app"));
+
+  if (existing.length > 0) {
+    console.log(`  ✓ [EXISTS] openai-codex-app already in DB (id: ${existing[0].id})`);
+    return existing[0].id;
+  }
+
+  // Get OpenAI provider ID
+  const openaiProvider = await db
+    .select()
+    .from(providers)
+    .where(eq(providers.slug, "openai"));
+
+  if (openaiProvider.length === 0) {
+    console.log(`  ✗ [ERROR] OpenAI provider not found`);
+    return null;
+  }
+
+  // Insert new Codex App product
+  const [newProduct] = await db
+    .insert(products)
+    .values({
+      providerId: openaiProvider[0].id,
+      name: "Codex App",
+      slug: "openai-codex-app",
+      type: "desktop",
+      description: "OpenAI Codex desktop application",
+    })
+    .returning({ id: products.id, slug: products.slug });
+
+  console.log(`  ✓ [INSERTED] openai-codex-app (id: ${newProduct.id})`);
+  return newProduct.id;
+}
+
+async function addCodexAppSource(productId: number) {
+  console.log("\n🔄 Adding Codex App source...\n");
+
+  // Check if source already exists
+  const existingSources = await db
+    .select()
+    .from(sources)
+    .where(
+      and(
+        eq(sources.productId, productId),
+        eq(sources.url, "https://developers.openai.com/codex/changelog/")
+      )
+    );
+
+  if (existingSources.length > 0) {
+    // Update existing source's selector config
+    await db
+      .update(sources)
+      .set({
+        selectorConfig: {
+          entrySelector: "li[data-codex-topics='codex-app']",
+          dateSelector: "time",
+          titleSelector: "h3 > span:first-child",
+          contentSelector: "article",
+        },
+      })
+      .where(eq(sources.id, existingSources[0].id));
+    console.log(`  ✓ [UPDATED] Codex App source selector config`);
+    return;
+  }
+
+  // Insert new source
+  await db.insert(sources).values({
+    productId,
+    url: "https://developers.openai.com/codex/changelog/",
+    scrapeMethod: "static",
+    selectorConfig: {
+      entrySelector: "li[data-codex-topics='codex-app']",
+      dateSelector: "time",
+      titleSelector: "h3 > span:first-child",
+      contentSelector: "article",
+    },
+    isActive: true,
+  });
+
+  console.log(`  ✓ [INSERTED] Codex App source (static scraper)`);
 }
 
 async function main() {
-  await renameProducts();
+  const codexAppProductId = await updateCodexProducts();
+  if (codexAppProductId) {
+    await addCodexAppSource(codexAppProductId);
+  }
   await updateSources();
 }
 

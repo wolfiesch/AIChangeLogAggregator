@@ -156,10 +156,17 @@ const seedProducts: SeedProduct[] = [
   },
   {
     providerSlug: "openai",
-    name: "Codex",
+    name: "Codex CLI",
     slug: "openai-codex",
+    type: "cli",
+    description: "OpenAI Codex CLI coding agent",
+  },
+  {
+    providerSlug: "openai",
+    name: "Codex App",
+    slug: "openai-codex-app",
     type: "desktop",
-    description: "OpenAI Codex CLI and desktop application",
+    description: "OpenAI Codex desktop application",
   },
   {
     providerSlug: "openai",
@@ -575,10 +582,23 @@ const seedSources: SeedSource[] = [
     url: "https://developers.openai.com/codex/changelog/",
     scrapeMethod: "static",
     selectorConfig: {
-      // Codex changelog: entries are <li data-product="codex"> with <time>, <h3>, and <article>
-      entrySelector: "li[data-product='codex']",
+      // Codex changelog: general announcements (GPT-5.4 mini, etc.)
+      // data-codex-topics differentiates: codex-cli, codex-app, general
+      entrySelector: "li[data-codex-topics='general']",
       dateSelector: "time",
-      titleSelector: "h3",
+      titleSelector: "h3 > span:first-child",
+      contentSelector: "article",
+    },
+  },
+  {
+    productSlug: "openai-codex-app",
+    url: "https://developers.openai.com/codex/changelog/",
+    scrapeMethod: "static",
+    selectorConfig: {
+      // Codex App (desktop) releases - e.g., 26.312, 26.311
+      entrySelector: "li[data-codex-topics='codex-app']",
+      dateSelector: "time",
+      titleSelector: "h3 > span:first-child",
       contentSelector: "article",
     },
   },
