@@ -1,8 +1,9 @@
 import { NextRequest } from "next/server";
 import { getRecentEntries } from "@/lib/queries";
-import { formatDate } from "@/lib/utils";
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://aichangelog.dev";
+const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://changelog.wolfgangschoenberger.com")
+  .trim()
+  .replace(/\/$/, "");
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;

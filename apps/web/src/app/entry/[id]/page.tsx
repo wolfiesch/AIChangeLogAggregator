@@ -8,12 +8,16 @@ export const dynamic = "force-dynamic";
 import { formatDate, getProductTypeColor, getProductTypeLabel } from "@/lib/utils";
 import { Header } from "@/components/header";
 import { SafeHtml } from "@/components/safe-html";
+import { getCurrentSubscriberId } from "@/lib/auth";
+import { getFollowedProductIds } from "@/lib/follows";
+import { FollowButton } from "@/components/follow-button";
 
 interface EntryPageProps {
   params: Promise<{ id: string }>;
 }
 
 export default async function EntryPage({ params }: EntryPageProps) {
+  const subscriberIdPromise = getCurrentSubscriberId();
   const { id } = await params;
   const entryId = parseInt(id, 10);
 
@@ -29,6 +33,11 @@ export default async function EntryPage({ params }: EntryPageProps) {
 
   const provider = entry.source?.product?.provider;
   const product = entry.source?.product;
+  const displayDate = entry.publishedDate ?? entry.createdAt;
+
+  const subscriberId = await subscriberIdPromise;
+  const followedIds = subscriberId ? await getFollowedProductIds(subscriberId) : [];
+  const isFollowing = product?.id ? followedIds.includes(product.id) : false;
 
   return (
     <div className="min-h-screen bg-background">
@@ -54,10 +63,10 @@ export default async function EntryPage({ params }: EntryPageProps) {
             {/* Meta info */}
             <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
               {/* Date */}
-              {entry.publishedDate && (
+              {displayDate && (
                 <div className="flex items-center gap-1">
                   <Calendar className="w-4 h-4" />
-                  {formatDate(entry.publishedDate)}
+                  {formatDate(displayDate)}
                 </div>
               )}
 
@@ -98,6 +107,13 @@ export default async function EntryPage({ params }: EntryPageProps) {
                 <span className="bg-secondary px-2 py-0.5 rounded">
                   v{entry.version}
                 </span>
+              )}
+
+              {product?.id && (
+                <FollowButton
+                  productId={product.id}
+                  initialFollowing={isFollowing}
+                />
               )}
             </div>
 

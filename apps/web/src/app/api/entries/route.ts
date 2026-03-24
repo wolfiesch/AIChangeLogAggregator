@@ -8,6 +8,7 @@ export async function GET(request: NextRequest) {
   const offset = parseInt(searchParams.get("offset") ?? "0", 10);
   const providerSlug = searchParams.get("provider") ?? undefined;
   const productSlug = searchParams.get("product") ?? undefined;
+  const type = searchParams.get("type") ?? undefined;
   const search = searchParams.get("search") ?? undefined;
   const startDate = searchParams.get("startDate")
     ? new Date(searchParams.get("startDate")!)
@@ -22,6 +23,7 @@ export async function GET(request: NextRequest) {
       offset,
       providerSlug,
       productSlug,
+      type,
       search,
       startDate,
       endDate,
@@ -29,6 +31,7 @@ export async function GET(request: NextRequest) {
     getEntriesCount({
       providerSlug,
       productSlug,
+      type,
       search,
       startDate,
       endDate,

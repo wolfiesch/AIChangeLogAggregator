@@ -4,8 +4,10 @@ import { emailSubscribers } from "@/db/schema";
 import { eq } from "drizzle-orm";
 
 const SITE_URL =
-  process.env.NEXT_PUBLIC_SITE_URL ||
-  "https://changelog.wolfgangschoenberger.com";
+  (process.env.NEXT_PUBLIC_SITE_URL ||
+    "https://changelog.wolfgangschoenberger.com")
+    .trim()
+    .replace(/\/$/, "");
 
 export async function GET(request: NextRequest) {
   const token = request.nextUrl.searchParams.get("token");

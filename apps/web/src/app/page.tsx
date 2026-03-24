@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import Link from "next/link";
+import { ChevronDown } from "lucide-react";
 import { getEntries, getProviders, getEntriesCount } from "@/lib/queries";
 
 // Force dynamic rendering - database queries at runtime
@@ -9,10 +10,14 @@ import { Header } from "@/components/header";
 import { FilterSidebar } from "@/components/filter-sidebar";
 import { SearchForm } from "@/components/search-form";
 import { Pagination } from "@/components/pagination";
+import { getCurrentSubscriberId } from "@/lib/auth";
+import { getFollowedProductIds } from "@/lib/follows";
+import { FollowButton } from "@/components/follow-button";
 
 interface SearchParams {
   provider?: string;
   product?: string;
+  type?: string;
   search?: string;
   page?: string;
 }
@@ -24,25 +29,36 @@ export default async function HomePage({
 }: {
   searchParams: Promise<SearchParams>;
 }) {
+  const subscriberIdPromise = getCurrentSubscriberId();
   const params = await searchParams;
   const page = parseInt(params.page ?? "1", 10);
   const offset = (page - 1) * ITEMS_PER_PAGE;
 
-  const [entries, providers, totalCount] = await Promise.all([
+  const followedIdsPromise = subscriberIdPromise.then(async (subscriberId) => {
+    if (!subscriberId) return [];
+    return getFollowedProductIds(subscriberId);
+  });
+
+  const [entries, providers, totalCount, followedIds] = await Promise.all([
     getEntries({
       limit: ITEMS_PER_PAGE,
       offset,
       providerSlug: params.provider,
       productSlug: params.product,
+      type: params.type,
       search: params.search,
     }),
     getProviders(),
     getEntriesCount({
       providerSlug: params.provider,
       productSlug: params.product,
+      type: params.type,
       search: params.search,
     }),
+    followedIdsPromise,
   ]);
+
+  const followedSet = new Set(followedIds);
 
   const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE);
 
@@ -57,8 +73,7 @@ export default async function HomePage({
             <Suspense fallback={<div className="text-muted-foreground">Loading...</div>}>
               <FilterSidebar
                 providers={providers}
-                selectedProvider={params.provider}
-                selectedProduct={params.product}
+                searchParams={params as Record<string, string | undefined>}
               />
             </Suspense>
           </aside>
@@ -70,8 +85,24 @@ export default async function HomePage({
               <SearchForm defaultValue={params.search} />
             </div>
 
+            {/* Mobile filters */}
+            <div className="mb-4 md:hidden">
+              <details className="group border border-border rounded">
+                <summary className="flex items-center justify-between gap-2 px-3 py-2 cursor-pointer select-none text-sm font-medium [&::-webkit-details-marker]:hidden">
+                  <span>Filters</span>
+                  <ChevronDown className="w-4 h-4 text-muted-foreground transition-transform group-open:rotate-180" />
+                </summary>
+                <div className="px-3 py-3 border-t border-border">
+                  <FilterSidebar
+                    providers={providers}
+                    searchParams={params as Record<string, string | undefined>}
+                  />
+                </div>
+              </details>
+            </div>
+
             {/* Active filters */}
-            {(params.provider || params.product || params.search) && (
+            {(params.provider || params.product || params.type || params.search) && (
               <div className="mb-4 flex items-center gap-2 text-sm">
                 <span className="text-muted-foreground">Filters:</span>
                 {params.provider && (
@@ -82,6 +113,11 @@ export default async function HomePage({
                 {params.product && (
                   <span className="bg-secondary px-2 py-0.5 rounded">
                     {params.product}
+                  </span>
+                )}
+                {params.type && (
+                  <span className="bg-secondary px-2 py-0.5 rounded">
+                    {getProductTypeLabel(params.type)}
                   </span>
                 )}
                 {params.search && (
@@ -100,7 +136,7 @@ export default async function HomePage({
 
             {/* Results count */}
             <div className="text-sm text-muted-foreground mb-4">
-              {totalCount} {totalCount === 1 ? "entry" : "entries"}
+              {totalCount.toLocaleString()} {totalCount === 1 ? "entry" : "entries"}
               {page > 1 && ` (page ${page} of ${totalPages})`}
             </div>
 
@@ -109,7 +145,7 @@ export default async function HomePage({
               {entries.length === 0 ? (
                 <div className="text-center py-12 text-muted-foreground">
                   <p>No changelog entries found.</p>
-                  {(params.provider || params.product || params.search) && (
+                  {(params.provider || params.product || params.type || params.search) && (
                     <p className="mt-2">
                       <Link href="/" className="text-primary hover:underline">
                         Clear filters
@@ -153,7 +189,9 @@ export default async function HomePage({
                         {/* Meta row */}
                         <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5 flex-wrap">
                           <span>
-                            {formatRelativeDate(entry.publishedDate)}
+                            {formatRelativeDate(
+                              entry.publishedDate ?? entry.createdAt
+                            )}
                           </span>
                           <span>|</span>
                           {entry.source?.product?.provider && (
@@ -188,6 +226,15 @@ export default async function HomePage({
                             <span className="bg-secondary px-1.5 py-0.5 rounded">
                               v{entry.version}
                             </span>
+                          )}
+                          {entry.source?.product?.id && (
+                            <FollowButton
+                              productId={entry.source.product.id}
+                              initialFollowing={followedSet.has(
+                                entry.source.product.id
+                              )}
+                              variant="compact"
+                            />
                           )}
                         </div>
                       </div>

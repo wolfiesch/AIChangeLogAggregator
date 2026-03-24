@@ -1,12 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createHash, randomBytes } from "crypto";
 import { db } from "@/lib/db";
-import { emailSubscribers } from "@/db/schema";
-import { and, eq, isNull } from "drizzle-orm";
+import { authMagicLinks, emailSubscribers, userFollows } from "@/db/schema";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import { getEntriesSince } from "@/lib/queries";
 import { sendDigestEmail, type DigestEntry } from "@/lib/email";
 
 // Vercel cron secret for authentication
 const CRON_SECRET = process.env.CRON_SECRET;
+
+const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://changelog.wolfgangschoenberger.com")
+  .trim()
+  .replace(/\/$/, "");
+
+function sha256Hex(input: string): string {
+  return createHash("sha256").update(input).digest("hex");
+}
 
 /**
  * Weekly digest cron endpoint
@@ -47,16 +56,6 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Transform entries for email
-    const digestEntries: DigestEntry[] = entries.map((entry) => ({
-      providerName: entry.source?.product?.provider?.name || "Unknown",
-      productName: entry.source?.product?.name || "Unknown",
-      title: entry.title,
-      content: entry.content,
-      publishedDate: entry.publishedDate,
-      url: entry.url,
-    }));
-
     // Get verified, active subscribers
     const subscribers = await db.query.emailSubscribers.findMany({
       where: and(
@@ -73,21 +72,84 @@ export async function GET(request: NextRequest) {
       });
     }
 
+    // Preload follows for all subscribers (avoid N queries)
+    const subscriberIds = subscribers.map((s) => s.id);
+    const followRows = await db
+      .select({
+        subscriberId: userFollows.subscriberId,
+        productId: userFollows.productId,
+      })
+      .from(userFollows)
+      .where(
+        sql`${userFollows.subscriberId} IN (${sql.join(
+          subscriberIds.map((id) => sql`${id}`),
+          sql`, `
+        )})`
+      );
+
+    const followsBySubscriber = new Map<number, Set<number>>();
+    for (const row of followRows) {
+      const set = followsBySubscriber.get(row.subscriberId) ?? new Set<number>();
+      set.add(row.productId);
+      followsBySubscriber.set(row.subscriberId, set);
+    }
+
     // Send digest to each subscriber
     const results = {
       sent: 0,
       failed: 0,
+      skipped: 0,
       errors: [] as string[],
     };
 
     for (const subscriber of subscribers) {
       try {
+        const followedSet = followsBySubscriber.get(subscriber.id) ?? new Set<number>();
+
+        // If the user follows products, personalize. Otherwise, fallback to global digest.
+        const relevantEntries =
+          followedSet.size > 0
+            ? entries.filter((e) => {
+                const productId = e.source?.product?.id;
+                return typeof productId === "number" && followedSet.has(productId);
+              })
+            : entries;
+
+        if (relevantEntries.length === 0) {
+          results.skipped++;
+          continue;
+        }
+
+        const digestEntries: DigestEntry[] = relevantEntries.map((entry) => ({
+          providerName: entry.source?.product?.provider?.name || "Unknown",
+          productName: entry.source?.product?.name || "Unknown",
+          title: entry.title,
+          content: entry.content,
+          publishedDate: entry.publishedDate,
+          url: `${SITE_URL}/entry/${entry.id}`,
+        }));
+
+        // Generate a one-click manage link (auth via magic link)
+        const manageToken = randomBytes(32).toString("hex");
+        await db.insert(authMagicLinks).values({
+          subscriberId: subscriber.id,
+          tokenHash: sha256Hex(manageToken),
+          // 7 days
+          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        });
+
+        const manageUrl = `${SITE_URL}/api/auth/callback?token=${manageToken}&next=/providers`;
+
         await sendDigestEmail(
           subscriber.email,
           subscriber.unsubscribeToken,
           digestEntries,
           weekStart,
-          weekEnd
+          weekEnd,
+          {
+            manageUrl,
+            personalized: followedSet.size > 0,
+          }
         );
         results.sent++;
       } catch (error) {
@@ -102,6 +164,7 @@ export async function GET(request: NextRequest) {
       subscribersCount: subscribers.length,
       sent: results.sent,
       failed: results.failed,
+      skipped: results.skipped,
       errors: results.errors.length > 0 ? results.errors : undefined,
     });
   } catch (error) {

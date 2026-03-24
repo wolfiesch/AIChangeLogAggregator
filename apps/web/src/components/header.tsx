@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Rss } from "lucide-react";
+import { AuthNav } from "@/components/auth-nav";
 
 export function Header() {
   return (
@@ -16,6 +17,10 @@ export function Header() {
                 new
               </Link>
               <span className="opacity-50">|</span>
+              <Link href="/following" className="hover:underline">
+                following
+              </Link>
+              <span className="opacity-50">|</span>
               <Link href="/providers" className="hover:underline">
                 providers
               </Link>
@@ -28,6 +33,7 @@ export function Header() {
 
           {/* RSS */}
           <div className="flex items-center gap-3">
+            <AuthNav />
             <a
               href="/api/rss"
               className="flex items-center gap-1 text-sm hover:underline"

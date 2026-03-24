@@ -6,9 +6,10 @@ import { Search } from "lucide-react";
 
 interface SearchFormProps {
   defaultValue?: string;
+  baseUrl?: string;
 }
 
-export function SearchForm({ defaultValue = "" }: SearchFormProps) {
+export function SearchForm({ defaultValue = "", baseUrl = "/" }: SearchFormProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
@@ -29,7 +30,8 @@ export function SearchForm({ defaultValue = "" }: SearchFormProps) {
     params.delete("page");
 
     startTransition(() => {
-      router.push(`/?${params.toString()}`);
+      const query = params.toString();
+      router.push(`${baseUrl}${query ? `?${query}` : ""}`);
     });
   };
 

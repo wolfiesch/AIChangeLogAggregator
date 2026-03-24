@@ -15,7 +15,9 @@ function getResend(): Resend {
 }
 
 const FROM_EMAIL = "AI Changelog <digest@changelog.wolfgangschoenberger.com>";
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://changelog.wolfgangschoenberger.com";
+const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://changelog.wolfgangschoenberger.com")
+  .trim()
+  .replace(/\/$/, "");
 
 /**
  * Send verification email to new subscriber
@@ -71,6 +73,58 @@ export async function sendVerificationEmail(
 }
 
 /**
+ * Send passwordless sign-in email (magic link)
+ */
+ export async function sendSignInEmail(
+  email: string,
+  token: string,
+  nextPath?: string
+ ) {
+  const nextParam = nextPath ? `&next=${encodeURIComponent(nextPath)}` : "";
+  const signInUrl = `${SITE_URL}/api/auth/callback?token=${encodeURIComponent(token)}${nextParam}`;
+
+  const { error } = await getResend().emails.send({
+    from: FROM_EMAIL,
+    to: email,
+    subject: "Sign in to AI Changelog",
+    html: `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f5f5f5;">
+  <div style="background-color: white; border-radius: 8px; padding: 32px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+    <h1 style="color: #1a1a1a; font-size: 24px; margin-bottom: 16px;">Sign in to AI Changelog</h1>
+    <p style="color: #4a4a4a; font-size: 16px; line-height: 1.6;">
+      Click the button below to sign in. This link expires soon.
+    </p>
+    <div style="text-align: center; margin: 32px 0;">
+      <a href="${signInUrl}" style="display: inline-block; background-color: #0066cc; color: white; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: 600;">
+        Sign in
+      </a>
+    </div>
+    <p style="color: #666; font-size: 14px;">
+      Or copy this link: <a href="${signInUrl}" style="color: #0066cc;">${signInUrl}</a>
+    </p>
+    <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;">
+    <p style="color: #888; font-size: 12px;">
+      If you didn't request this email, you can safely ignore it.
+    </p>
+  </div>
+</body>
+</html>
+    `,
+  });
+
+  if (error) {
+    console.error("Failed to send sign-in email:", error);
+    throw new Error("Failed to send sign-in email");
+  }
+}
+
+/**
  * Send weekly digest email
  */
 export interface DigestEntry {
@@ -87,9 +141,15 @@ export async function sendDigestEmail(
   unsubscribeToken: string,
   entries: DigestEntry[],
   weekStart: Date,
-  weekEnd: Date
+  weekEnd: Date,
+  options?: {
+    manageUrl?: string;
+    personalized?: boolean;
+  }
 ) {
   const unsubscribeUrl = `${SITE_URL}/api/unsubscribe?token=${unsubscribeToken}`;
+  const manageUrl = options?.manageUrl;
+  const personalized = options?.personalized === true;
 
   // Group entries by provider
   const entriesByProvider = entries.reduce((acc, entry) => {
@@ -146,6 +206,18 @@ export async function sendDigestEmail(
       <p style="color: #666; font-size: 14px; margin-top: 8px;">
         ${formatDate(weekStart)} - ${formatDate(weekEnd)} | ${entries.length} updates
       </p>
+      <p style="color: #666; font-size: 13px; margin-top: 8px;">
+        ${personalized ? "Personalized to the products you follow." : "Tip: follow products to personalize this digest."}
+      </p>
+      ${
+        manageUrl
+          ? `<div style="margin-top: 14px;">
+        <a href="${manageUrl}" style="display: inline-block; background-color: #111; color: white; padding: 10px 18px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 13px;">
+          Manage followed products
+        </a>
+      </div>`
+          : ""
+      }
     </div>
 
     ${entriesHtml}
