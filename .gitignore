@@ -9,6 +9,7 @@ out/
 
 # Environment files
 .env
+.env.*
 .env.local
 .env.*.local
 
@@ -45,3 +46,4 @@ playwright/.cache/
 *.db
 *.sqlite
 .vercel
+.env*.local

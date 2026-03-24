@@ -88,7 +88,7 @@ export const changelogEntries = pgTable(
     contentHtml: text("content_html"),
     contentHash: varchar("content_hash", { length: 64 }).unique(), // SHA-256 for deduplication
     url: text("url"), // Deep link to specific entry
-    version: varchar("version", { length: 50 }), // If applicable
+    version: varchar("version", { length: 255 }), // If applicable (increased from 50 for long version tags)
     tags: text("tags").array(), // 'feature', 'fix', 'deprecation', etc.
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
@@ -146,7 +146,105 @@ export const emailSubscribers = pgTable("email_subscribers", {
   unsubscribeToken: varchar("unsubscribe_token", { length: 64 }).notNull(),
   subscribedAt: timestamp("subscribed_at", { withTimezone: true }).defaultNow(),
   unsubscribedAt: timestamp("unsubscribed_at", { withTimezone: true }),
+  lastSeenAt: timestamp("last_seen_at", { withTimezone: true }),
 });
+
+// ==========================================================================
+// Auth Magic Links (passwordless sign-in)
+// ==========================================================================
+export const authMagicLinks = pgTable(
+  "auth_magic_links",
+  {
+    id: serial("id").primaryKey(),
+    subscriberId: integer("subscriber_id")
+      .references(() => emailSubscribers.id)
+      .notNull(),
+    tokenHash: varchar("token_hash", { length: 64 }).notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    usedAt: timestamp("used_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  },
+  (table) => [
+    index("idx_auth_magic_links_subscriber").on(table.subscriberId),
+    uniqueIndex("idx_auth_magic_links_token").on(table.tokenHash),
+  ]
+);
+
+export const authMagicLinksRelations = relations(authMagicLinks, ({ one }) => ({
+  subscriber: one(emailSubscribers, {
+    fields: [authMagicLinks.subscriberId],
+    references: [emailSubscribers.id],
+  }),
+}));
+
+// ==========================================================================
+// Auth Sessions (cookie-backed)
+// ==========================================================================
+export const authSessions = pgTable(
+  "auth_sessions",
+  {
+    id: serial("id").primaryKey(),
+    subscriberId: integer("subscriber_id")
+      .references(() => emailSubscribers.id)
+      .notNull(),
+    sessionTokenHash: varchar("session_token_hash", { length: 64 }).notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  },
+  (table) => [
+    index("idx_auth_sessions_subscriber").on(table.subscriberId, table.createdAt),
+    uniqueIndex("idx_auth_sessions_token").on(table.sessionTokenHash),
+  ]
+);
+
+export const authSessionsRelations = relations(authSessions, ({ one }) => ({
+  subscriber: one(emailSubscribers, {
+    fields: [authSessions.subscriberId],
+    references: [emailSubscribers.id],
+  }),
+}));
+
+// ==========================================================================
+// User Follows (favorite products)
+// ==========================================================================
+export const userFollows = pgTable(
+  "user_follows",
+  {
+    id: serial("id").primaryKey(),
+    subscriberId: integer("subscriber_id")
+      .references(() => emailSubscribers.id)
+      .notNull(),
+    productId: integer("product_id")
+      .references(() => products.id)
+      .notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  },
+  (table) => [
+    index("idx_user_follows_subscriber").on(table.subscriberId),
+    uniqueIndex("idx_user_follows_unique").on(table.subscriberId, table.productId),
+  ]
+);
+
+export const userFollowsRelations = relations(userFollows, ({ one }) => ({
+  subscriber: one(emailSubscribers, {
+    fields: [userFollows.subscriberId],
+    references: [emailSubscribers.id],
+  }),
+  product: one(products, {
+    fields: [userFollows.productId],
+    references: [products.id],
+  }),
+}));
+
+export const emailSubscribersRelations = relations(
+  emailSubscribers,
+  ({ many }) => ({
+    sessions: many(authSessions),
+    magicLinks: many(authMagicLinks),
+    follows: many(userFollows),
+  })
+);
 
 // ============================================================================
 // Type exports for use in application code
@@ -168,3 +266,12 @@ export type NewScrapeRun = typeof scrapeRuns.$inferInsert;
 
 export type EmailSubscriber = typeof emailSubscribers.$inferSelect;
 export type NewEmailSubscriber = typeof emailSubscribers.$inferInsert;
+
+export type AuthMagicLink = typeof authMagicLinks.$inferSelect;
+export type NewAuthMagicLink = typeof authMagicLinks.$inferInsert;
+
+export type AuthSession = typeof authSessions.$inferSelect;
+export type NewAuthSession = typeof authSessions.$inferInsert;
+
+export type UserFollow = typeof userFollows.$inferSelect;
+export type NewUserFollow = typeof userFollows.$inferInsert;

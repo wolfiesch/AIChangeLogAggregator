@@ -15,6 +15,20 @@
       "when": 1769093741561,
       "tag": "0001_round_sunset_bain",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1770588973623,
+      "tag": "0002_empty_black_panther",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1770603127258,
+      "tag": "0003_nervous_clea",
+      "breakpoints": true
     }
   ]
 }
