@@ -11,12 +11,12 @@
     "test:scraper": "tsx src/jobs/test-scraper.ts"
   },
   "dependencies": {
-    "@hono/node-server": "^1.13.8",
+    "@hono/node-server": "^1.19.13",
     "@neondatabase/serverless": "^0.10.4",
     "@octokit/rest": "^21.1.0",
     "cheerio": "^1.0.0",
-    "drizzle-orm": "^0.38.3",
-    "hono": "^4.7.0",
+    "drizzle-orm": "^0.45.2",
+    "hono": "^4.12.12",
     "marked": "^15.0.6",
     "playwright": "^1.50.0",
     "puppeteer": "^23.0.0",
