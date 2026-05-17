@@ -34,6 +34,10 @@ if (!scraperApiKey && allowInsecureLocalDev) {
   );
 }
 
+const configuredScraperApiKeyHash = scraperApiKey
+  ? hashApiKey(scraperApiKey)
+  : undefined;
+
 const sql = neon(process.env.DATABASE_URL!);
 const db = drizzle(sql, { schema });
 
@@ -44,11 +48,11 @@ function hashApiKey(value: string): Buffer {
 function isAuthorizedScraperRequest(suppliedApiKey: string | undefined): boolean {
   const supplied = suppliedApiKey?.trim();
 
-  if (!scraperApiKey || !supplied) {
+  if (!configuredScraperApiKeyHash || !supplied) {
     return false;
   }
 
-  return timingSafeEqual(hashApiKey(supplied), hashApiKey(scraperApiKey));
+  return timingSafeEqual(hashApiKey(supplied), configuredScraperApiKeyHash);
 }
 
 function requireScraperApiKey(c: Context) {
