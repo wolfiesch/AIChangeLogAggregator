@@ -1,8 +1,9 @@
 import { Hono } from "hono";
+import type { Context } from "hono";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import { serve } from "@hono/node-server";
-import { createHash } from "crypto";
+import { createHash, timingSafeEqual } from "crypto";
 import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
 import { eq, desc } from "drizzle-orm";
@@ -15,10 +16,55 @@ import {
   type Scraper,
 } from "./scrapers/index.js";
 
+const app = new Hono();
+const scraperApiKey = process.env.SCRAPER_API_KEY?.trim();
+const nodeEnv = process.env.NODE_ENV?.trim().toLowerCase();
+const localDevEnvironments = new Set(["development", "dev", "test", "local"]);
+const allowInsecureLocalDev =
+  process.env.SCRAPER_ALLOW_INSECURE_LOCAL_DEV === "true" &&
+  nodeEnv !== undefined &&
+  localDevEnvironments.has(nodeEnv);
+
+if (!scraperApiKey && !allowInsecureLocalDev) {
+  throw new Error(
+    "SCRAPER_API_KEY must be set to a non-empty value before starting the scraper server."
+  );
+}
+
+if (!scraperApiKey && allowInsecureLocalDev) {
+  console.warn(
+    "WARNING: SCRAPER_API_KEY is unset. Protected scraper endpoints will reject requests."
+  );
+}
+
+const configuredScraperApiKeyHash = scraperApiKey
+  ? hashApiKey(scraperApiKey)
+  : undefined;
+
 const sql = neon(process.env.DATABASE_URL!);
 const db = drizzle(sql, { schema });
 
-const app = new Hono();
+function hashApiKey(value: string): Buffer {
+  return createHash("sha256").update(value).digest();
+}
+
+function isAuthorizedScraperRequest(suppliedApiKey: string | undefined): boolean {
+  const supplied = suppliedApiKey?.trim();
+
+  if (!configuredScraperApiKeyHash || !supplied) {
+    return false;
+  }
+
+  return timingSafeEqual(hashApiKey(supplied), configuredScraperApiKeyHash);
+}
+
+function requireScraperApiKey(c: Context) {
+  if (!isAuthorizedScraperRequest(c.req.header("X-API-Key"))) {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
+
+  return undefined;
+}
 
 // Middleware
 app.use("*", logger());
@@ -40,6 +86,9 @@ app.get("/health", (c) => {
 
 // Get scraper status
 app.get("/status", async (c) => {
+  const unauthorized = requireScraperApiKey(c);
+  if (unauthorized) return unauthorized;
+
   const recentRuns = await db.query.scrapeRuns.findMany({
     limit: 20,
     orderBy: [desc(schema.scrapeRuns.startedAt)],
@@ -78,10 +127,8 @@ app.get("/status", async (c) => {
 
 // Trigger a full scrape (protected by API key)
 app.post("/scrape", async (c) => {
-  const apiKey = c.req.header("X-API-Key");
-  if (apiKey !== process.env.SCRAPER_API_KEY) {
-    return c.json({ error: "Unauthorized" }, 401);
-  }
+  const unauthorized = requireScraperApiKey(c);
+  if (unauthorized) return unauthorized;
 
   // Run scrape in background
   runFullScrape().catch(console.error);
@@ -94,10 +141,8 @@ app.post("/scrape", async (c) => {
 
 // Scrape a single source (protected by API key)
 app.post("/scrape/:sourceId", async (c) => {
-  const apiKey = c.req.header("X-API-Key");
-  if (apiKey !== process.env.SCRAPER_API_KEY) {
-    return c.json({ error: "Unauthorized" }, 401);
-  }
+  const unauthorized = requireScraperApiKey(c);
+  if (unauthorized) return unauthorized;
 
   const sourceId = parseInt(c.req.param("sourceId"), 10);
 
