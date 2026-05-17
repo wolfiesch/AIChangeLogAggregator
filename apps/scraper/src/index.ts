@@ -18,9 +18,12 @@ import {
 
 const app = new Hono();
 const scraperApiKey = process.env.SCRAPER_API_KEY?.trim();
+const nodeEnv = process.env.NODE_ENV?.trim().toLowerCase();
+const localDevEnvironments = new Set(["development", "dev", "test", "local"]);
 const allowInsecureLocalDev =
   process.env.SCRAPER_ALLOW_INSECURE_LOCAL_DEV === "true" &&
-  process.env.NODE_ENV !== "production";
+  nodeEnv !== undefined &&
+  localDevEnvironments.has(nodeEnv);
 
 if (!scraperApiKey && !allowInsecureLocalDev) {
   throw new Error(
