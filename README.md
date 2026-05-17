@@ -141,9 +141,14 @@ The scraper runs every 6 hours via Fly.io scheduled tasks:
 | Endpoint | Description |
 |----------|-------------|
 | `GET /` | Health check |
-| `GET /status` | Scraper status and recent runs |
+| `GET /status` | Scraper status and recent runs (API key required) |
 | `POST /scrape` | Trigger full scrape (API key required) |
 | `POST /scrape/:sourceId` | Scrape single source (API key required) |
+
+The scraper server requires `SCRAPER_API_KEY` at startup. For local development
+only, set `SCRAPER_ALLOW_INSECURE_LOCAL_DEV=true` with a non-production
+`NODE_ENV` to start the server without a key; protected endpoints still reject
+requests unless a non-empty `X-API-Key` matches the configured key.
 
 ## License
 
