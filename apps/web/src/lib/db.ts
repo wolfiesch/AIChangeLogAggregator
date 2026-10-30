@@ -12,6 +12,9 @@ function getDb() {
   // Vercel env values sometimes contain accidental whitespace or literal "\n".
   const databaseUrl = process.env.DATABASE_URL.replace(/\\n/g, "").replace(/\\r/g, "").trim();
   const pool = new Pool({ connectionString: databaseUrl, max: 5 });
+  // Idle clients can be dropped by the server; without a listener pg re-emits
+  // that as an unhandled 'error' event.
+  pool.on("error", (err) => console.error("Postgres pool error:", err.message));
   return drizzle(pool, { schema });
 }
 
