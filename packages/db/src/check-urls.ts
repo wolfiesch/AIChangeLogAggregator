@@ -1,10 +1,6 @@
-import { neon } from "@neondatabase/serverless";
-import { drizzle } from "drizzle-orm/neon-http";
+import { db } from "./client";
 import { like, eq } from "drizzle-orm";
 import { sources, products, providers } from "./schema";
-
-const sql = neon(process.env.DATABASE_URL!);
-const db = drizzle(sql);
 
 async function checkUrls() {
   console.log("Checking source URLs in database...\n");

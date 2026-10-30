@@ -1,10 +1,6 @@
-import { neon } from "@neondatabase/serverless";
-import { drizzle } from "drizzle-orm/neon-http";
+import { db } from "./client";
 import { eq } from "drizzle-orm";
 import { sources } from "./schema";
-
-const sql = neon(process.env.DATABASE_URL!);
-const db = drizzle(sql);
 
 /**
  * Fix failing source configurations based on actual HTML structure analysis

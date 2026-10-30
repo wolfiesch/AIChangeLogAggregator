@@ -4,8 +4,7 @@ import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import { serve } from "@hono/node-server";
 import { createHash, timingSafeEqual } from "crypto";
-import { neon } from "@neondatabase/serverless";
-import { drizzle } from "drizzle-orm/neon-http";
+import { db } from "./db/client.js";
 import { eq, desc } from "drizzle-orm";
 import * as schema from "./db/schema.js";
 import {
@@ -40,9 +39,6 @@ if (!scraperApiKey && allowInsecureLocalDev) {
 const configuredScraperApiKeyHash = scraperApiKey
   ? hashApiKey(scraperApiKey)
   : undefined;
-
-const sql = neon(process.env.DATABASE_URL!);
-const db = drizzle(sql, { schema });
 
 function hashApiKey(value: string): Buffer {
   return createHash("sha256").update(value).digest();

@@ -1,6 +1,5 @@
-import { neon } from "@neondatabase/serverless";
-
-const sql = neon(process.env.DATABASE_URL!);
+import { sql } from "drizzle-orm";
+import { db } from "./client";
 
 // URLs to disable (Intercom bot detection + Grok bot detection)
 const urlsToDisable = [
@@ -22,13 +21,13 @@ async function disableSources() {
   const allUrls = [...urlsToDisable, sourcegraphUrl];
 
   for (const url of allUrls) {
-    const result = await sql`
+    const result = await db.execute(sql`
       UPDATE sources
       SET is_active = false
       WHERE url = ${url}
       RETURNING id, url
-    `;
-    if (result.length > 0) {
+    `);
+    if (result.rows.length > 0) {
       console.log(`✓ Disabled: ${url}`);
     } else {
       console.log(`- Not found: ${url}`);

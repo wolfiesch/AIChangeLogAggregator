@@ -1,10 +1,6 @@
-import { neon } from "@neondatabase/serverless";
-import { drizzle } from "drizzle-orm/neon-http";
+import { db } from "./client";
 import { eq, desc, sql as sqlFn, and, gt } from "drizzle-orm";
 import { sources, scrapeRuns, products, providers } from "./schema";
-
-const sql = neon(process.env.DATABASE_URL!);
-const db = drizzle(sql);
 
 /**
  * Audit sources to find those that are failing (returning 0 entries)

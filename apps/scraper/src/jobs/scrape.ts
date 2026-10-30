@@ -1,6 +1,5 @@
 import { createHash } from "crypto";
-import { neon } from "@neondatabase/serverless";
-import { drizzle } from "drizzle-orm/neon-http";
+import { db } from "../db/client.js";
 import { eq } from "drizzle-orm";
 import * as schema from "../db/schema.js";
 import {
@@ -10,9 +9,6 @@ import {
   type Scraper,
   type ParsedEntry,
 } from "../scrapers/index.js";
-
-const sql = neon(process.env.DATABASE_URL!);
-const db = drizzle(sql, { schema });
 
 /**
  * Content hash for deduplication

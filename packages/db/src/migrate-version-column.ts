@@ -1,10 +1,9 @@
-import { neon } from "@neondatabase/serverless";
-
-const sql = neon(process.env.DATABASE_URL!);
+import { sql } from "drizzle-orm";
+import { db } from "./client";
 
 async function migrate() {
   console.log("Migrating version column from varchar(50) to varchar(255)...");
-  await sql`ALTER TABLE changelog_entries ALTER COLUMN version TYPE varchar(255)`;
+  await db.execute(sql`ALTER TABLE changelog_entries ALTER COLUMN version TYPE varchar(255)`);
   console.log("Migration successful!");
 }
 

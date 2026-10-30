@@ -36,7 +36,7 @@ A one-stop-shop for tracking all changelog updates from Frontier AI providers. A
 
 - **Frontend**: Next.js 15, React 19, Tailwind CSS
 - **Backend**: Hono.js on Fly.io
-- **Database**: Neon PostgreSQL with Drizzle ORM
+- **Database**: PostgreSQL (any server, including Neon) with Drizzle ORM
 - **Scraping**: Cheerio (static), Octokit (GitHub), Playwright (JS-rendered)
 
 ## Project Structure
@@ -57,7 +57,7 @@ AIChangeLogAggregator/
 
 - Node.js 20+
 - pnpm 9+
-- Neon PostgreSQL database
+- PostgreSQL database
 
 ### Installation
 
@@ -109,7 +109,7 @@ cd apps/scraper
 fly launch
 
 # Set secrets
-fly secrets set DATABASE_URL="your-neon-url"
+fly secrets set DATABASE_URL="your-postgres-url"
 fly secrets set GITHUB_TOKEN="your-github-token"
 fly secrets set SCRAPER_API_KEY="your-api-key"
 
