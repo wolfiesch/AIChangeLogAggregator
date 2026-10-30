@@ -1,5 +1,5 @@
-import { neon } from "@neondatabase/serverless";
-import { drizzle } from "drizzle-orm/neon-http";
+import { Pool } from "pg";
+import { drizzle } from "drizzle-orm/node-postgres";
 import * as schema from "@/db/schema";
 
 // Lazy database connection - only connects when first used
@@ -11,8 +11,8 @@ function getDb() {
 
   // Vercel env values sometimes contain accidental whitespace or literal "\n".
   const databaseUrl = process.env.DATABASE_URL.replace(/\\n/g, "").replace(/\\r/g, "").trim();
-  const sql = neon(databaseUrl);
-  return drizzle(sql, { schema });
+  const pool = new Pool({ connectionString: databaseUrl, max: 5 });
+  return drizzle(pool, { schema });
 }
 
 // Cache the db instance

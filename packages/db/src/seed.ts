@@ -1,9 +1,5 @@
-import { neon } from "@neondatabase/serverless";
-import { drizzle } from "drizzle-orm/neon-http";
+import { db } from "./client";
 import { providers, products, sources } from "./schema";
-
-const sql = neon(process.env.DATABASE_URL!);
-const db = drizzle(sql);
 
 // ============================================================================
 // Seed Data: All AI Providers, Products, and Changelog Sources
